@@ -18,27 +18,20 @@ const UPDATE = "update-project/";
 const DELETE_PATH = "delete-project/";
 const TOP_PROJECTS = "top-projects/";
 
-function normalizeProjectFeature(f
-
-
-
-) {
-  const props = (_nullishCoalesce(f.properties, () => ( f))) ;
-  const geom = _nullishCoalesce((f ).geometry, () => ( props.geom));
+// project.js
+function normalizeProjectFeature(f) {
+  const props = f.properties ?? f;
+  const geom = f.geometry ?? props.geom;
   const project = {
-    id: (_nullishCoalesce(f.id, () => ( props.id))) ,
-    ...(props ),
+    id: f.id ?? props.id,
+    ...props,
     ...(geom !== undefined && { geom }),
-  } ;
+  };
 
-  // Normalize activities shape so UI can rely on ONE approach:
-  // percent_complete + finish_date (legacy naming) regardless of backend serializer keys.
-  if (Array.isArray((project ).activities)) {
-    (project ).activities = (project ).activities.map((a) => {
-      const percent_complete =
-        _nullishCoalesce(_nullishCoalesce(_optionalChain([a, 'optionalAccess', _ => _.percent_complete]), () => ( _optionalChain([a, 'optionalAccess', _2 => _2.progress]))), () => ( 0));
-      const finish_date =
-        _nullishCoalesce(_nullishCoalesce(_optionalChain([a, 'optionalAccess', _3 => _3.finish_date]), () => ( _optionalChain([a, 'optionalAccess', _4 => _4.end_date]))), () => ( null));
+  if (Array.isArray(project.activities)) {
+    project.activities = project.activities.map((a) => {
+      const percent_complete = a?.percent_complete ?? a?.progress ?? 0;
+      const finish_date = a?.finish_date ?? a?.end_date ?? null;
       return { ...a, percent_complete, finish_date };
     });
   }
@@ -49,19 +42,39 @@ export async function listProjects() {
   try {
     const data = await get(LIST);
     if (!data) return [];
-    if (typeof data === "object" && "features" in data && Array.isArray((data ).features)) {
-      return (data ).features.map((f) => normalizeProjectFeature(f));
+
+    // Your actual backend shape: { status, message, data: [...] }
+    if (typeof data === "object" && Array.isArray(data.data)) {
+      return data.data.map((f) => normalizeProjectFeature(f));
     }
+
+    // GeoJSON FeatureCollection
+    if (typeof data === "object" && Array.isArray(data.features)) {
+      return data.features.map((f) => normalizeProjectFeature(f));
+    }
+
+    // Plain array
     if (Array.isArray(data)) {
-      return data.map((f) => normalizeProjectFeature(f ));
+      return data.map((f) => normalizeProjectFeature(f));
     }
+
+    // DRF pagination
+    if (typeof data === "object" && "results" in data) {
+      const results = Array.isArray(data.results)
+        ? data.results
+        : Array.isArray(data.results?.features)
+        ? data.results.features
+        : [];
+      return results.map((f) => normalizeProjectFeature(f));
+    }
+
+    console.warn("listProjects: unrecognized response shape", data);
     return [];
-  } catch {
-    // No mock fallback: view page should reflect real backend data only.
+  } catch (err) {
+    console.error("listProjects failed:", err);
     return [];
   }
 }
-
 /** GET /api/top-projects/ — returns list of top projects with progress % */
 export async function listTopProjects() {
   const data = await get(TOP_PROJECTS);
@@ -156,7 +169,10 @@ export async function createProject(payload) {
     appendFormValue(form, "total_consume", _nullishCoalesce(payload.total_consume, () => ( "")));
     appendFormValue(form, "remaining_budget", _nullishCoalesce(payload.remaining_budget, () => ( "")));
 
-    if (payload.xer_file) form.append("xer_file", payload.xer_file);
+    if (payload.xer_file) {
+      form.append("xer_file", payload.xer_file);
+      form.append("xer_file_name", payload.xer_file.name);
+    }
 
     let boundaryFile = _nullishCoalesce(payload.boundary_file, () => ( null));
     if (boundaryFile) {
@@ -217,7 +233,10 @@ export async function updateProject(id, payload) {
     appendFormValue(form, "total_consume", p.total_consume);
     appendFormValue(form, "remaining_budget", p.remaining_budget);
 
-    if (p.xer_file) form.append("xer_file", p.xer_file);
+    if (p.xer_file) {
+      form.append("xer_file", p.xer_file);
+      form.append("xer_file_name", p.xer_file.name);
+    }
 
     let boundaryFile = _nullishCoalesce(p.boundary_file, () => ( null));
     if (boundaryFile) {

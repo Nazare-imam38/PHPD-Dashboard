@@ -865,7 +865,7 @@ export default function Dashboard() {
     queryFn: () => getDashboardPageData(viewType),
     staleTime: 5 * 60 * 1000,
   });
-
+console.log("dashboardPageData:", dashboardPageData);
   const apiDivisions = dashboardPageData?.divisions ?? [];
   const apiDistricts = dashboardPageData?.districts ?? [];
   const apiTehsils = dashboardPageData?.tehsils ?? [];
@@ -1627,20 +1627,34 @@ export default function Dashboard() {
 
   // Divisions data for cards view (API-driven)
   const divisionsData = useMemo(() => {
-    return apiDivisions
-      .map((div, index) => {
-        const projects = apiProjects.filter((p) => p.division === div.id);
-        const overall = calcProjectsOverall(projects);
-        return {
-          id: div.id,
-          name: div.division_name,
-          overall,
-          data: generateCityDataFromOverall(overall),
-          color: CARD_COLORS[index % CARD_COLORS.length],
-        };
-      })
-      .sort((a, b) => b.overall - a.overall);
-  }, [apiDivisions, apiProjects]);
+  return apiDivisions
+    .map((div, index) => {
+      console.log("Division:", div);
+
+      const projects = apiProjects.filter((p) => {
+        return Number(p.division) === Number(div.id);
+      });
+
+      console.log("Projects found:", projects.length);
+
+      if (projects.length > 0) {
+        console.log("First project:", projects[0]);
+      }
+
+      const overall = calcProjectsOverall(projects);
+
+      console.log("Overall:", overall);
+
+      return {
+        id: div.id,
+        name: div.division_name,
+        overall,
+        data: generateCityDataFromOverall(overall),
+        color: CARD_COLORS[index % CARD_COLORS.length],
+      };
+    })
+    .sort((a, b) => b.overall - a.overall);
+}, [apiDivisions, apiProjects]);
 
   // Districts data for cards view (API-driven)
   const districtsData = useMemo(() => {

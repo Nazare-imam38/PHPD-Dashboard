@@ -8,12 +8,21 @@ const GIS_PROJECT_STATUS_PATH = "gis-project-status/";
  * Lightweight status-only dataset for the GIS dashboard. This intentionally
  * replaces the much larger project-gantt-all response on /gis.
  */
+// gis.js
+// gis.js
 export async function getGISProjectStatuses() {
-  const data = await get(GIS_PROJECT_STATUS_PATH);
+  try {
+    const data = await get(GIS_PROJECT_STATUS_PATH);
 
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.statuses)) return data.statuses;
-  if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.statuses)) return data.statuses;
+    if (Array.isArray(data?.results)) return data.results;
 
-  return [];
+    console.warn("getGISProjectStatuses: unrecognized response shape", data);
+    return [];
+  } catch (err) {
+    console.error("getGISProjectStatuses failed:", err);
+    return [];
+  }
 }

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery } from "@tanstack/react-query";
 import {
   listProjects,
+  listGISProjects,
   listProvinces,
   listDivisions,
   listDistricts,
@@ -285,18 +286,21 @@ export default function GISLayers() {
       districtNumeric,
       tehsilNumeric,
     ],
-    queryFn: () =>
-      listGISProjects({
+    queryFn: () => {
+
+      
+     return listGISProjects({
         zone: zoneNumeric,
-        circle: circleNumeric,
-        district: districtNumeric,
-        tehsil:
-          tehsilNumeric != null && Number.isFinite(tehsilNumeric)
-            ? tehsilNumeric
-            : undefined,
-      }),
-    ...PROJECT_QUERY_OPTIONS,
-  });
+      circle: circleNumeric,
+      district: districtNumeric,
+      tehsil:
+        tehsilNumeric != null && Number.isFinite(tehsilNumeric)
+          ? tehsilNumeric
+          : undefined,
+    });
+  },
+  ...PROJECT_QUERY_OPTIONS,
+});
 
   // Load only the lightweight GIS status summary. This replaces the full
   // nested /api/project-gantt-all/ payload on the GIS page.

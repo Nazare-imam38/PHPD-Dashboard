@@ -8,7 +8,9 @@ import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 import { Camera, AlertTriangle, Activity, Construction, Upload, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
+import MarkerClusterGroup from "react-leaflet-cluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 // Keep default icon defined but do NOT set it as the global prototype default.
 // Setting L.Marker.prototype.options.icon globally causes all GeoJSON Point
@@ -60,13 +62,24 @@ const getIncidentIcon = (severity) => L.divIcon({
 });
 
 
-
 const PROJECT_STATUS_STYLE = {
   in_progress: { color: "#0F4B3A", fillColor: "#0F4B3A" }, // in-progress
   in_delay: { color: "#e11d48", fillColor: "#e11d48" }, // rose-600
   pending: { color: "#d97706", fillColor: "#d97706" }, // amber-600
 };
-
+// Only 3 possible statuses — build these divIcons once (lazily, on first use)
+// instead of per-marker, per-render.
+let _statusIconCache = null;
+function getStatusIconCached(status) {
+  if (!_statusIconCache) {
+    _statusIconCache = {
+      in_progress: getProjectStatusIcon("in_progress"),
+      in_delay: getProjectStatusIcon("in_delay"),
+      pending: getProjectStatusIcon("pending"),
+    };
+  }
+  return _statusIconCache[status] ?? _statusIconCache.pending;
+}
 function getStatusSvg(status) {
   // Inline SVGs so Leaflet divIcon has no external deps.
   // Styled with currentColor to inherit the marker's white text color.
@@ -92,6 +105,7 @@ function getStatusSvg(status) {
 }
 
 function getProjectStatusIcon(status) {
+  
   const cfg = _nullishCoalesce(PROJECT_STATUS_STYLE[status], () => ( PROJECT_STATUS_STYLE.pending));
   const svg = getStatusSvg(status);
   const statusClass =
@@ -531,84 +545,77 @@ export function CityMap({
             )
           )
 
-          , geoData && (
-            React.createElement(LayersControl.Overlay, { checked: true, name: showGeoBoundary ? "Proposed Area Boundary" : "Project Locations"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 502}}
-              , React.createElement(React.Fragment, null
-                , showGeoBoundary && React.createElement(GeoJSON, {
-                  data: geoData,
-                  style: (feature) => {
-                    const status = _nullishCoalesce(_optionalChain([feature, 'optionalAccess', _3 => _3.properties, 'optionalAccess', _4 => _4.status]), () => ( "pending"));
-                    const cfg = _nullishCoalesce(PROJECT_STATUS_STYLE[status], () => ( PROJECT_STATUS_STYLE.pending));
-                    return {
-                      color: cfg.color,
-                      fillColor: cfg.fillColor,
-                      fillOpacity: 0.12,
-                      weight: 3,
-                    };
-                  },
-                  // Use an invisible icon for Point features — the status Marker below handles display.
-                  // Without this, Leaflet renders the default blue location-pin for Point geometries.
-                  pointToLayer: (_feature, latlng) => L.marker(latlng, { icon: INVISIBLE_ICON }),
-                  onEachFeature: (feature, layer) => {
-                    const name = _optionalChain([feature, 'access', _5 => _5.properties, 'optionalAccess', _6 => _6.project_name]);
-                    const status = _nullishCoalesce(_optionalChain([feature, 'optionalAccess', _7 => _7.properties, 'optionalAccess', _8 => _8.status]), () => ( "pending"));
-                    const statusLabel =
-                      status === "in_progress" ? "In Progress" : status === "in_delay" ? "Delayed" : "Pending";
-                    if (name != null && name !== '')
-                      layer.bindPopup(`<b>${String(name)}</b><br/>${statusLabel}`);
+          , (() => {
+              // Part A: split points out of the boundary GeoJSON — points are
+              // rendered separately as status markers below, so passing them
+              // into <GeoJSON> too was rendering every project TWICE.
+              const boundaryOnlyData = {
+                type: "FeatureCollection",
+                features: (_optionalChain([geoData, 'optionalAccess', _b => _b.features]) || []).filter(
+                  (f) => _optionalChain([f, 'optionalAccess', _b2 => _b2.geometry, 'optionalAccess', _b3 => _b3.type]) !== "Point"
+                ),
+              };
 
-                    const rawId = _optionalChain([feature, 'optionalAccess', _9 => _9.properties, 'optionalAccess', _10 => _10.id]);
-                    const idNum = typeof rawId === "number" ? rawId : Number(rawId);
-                    if (onProjectSelect && Number.isFinite(idNum)) {
-                      layer.on("click", () => {
-                        onProjectSelect(idNum);
-                      });
-                    }
-                  }, __self: this, __source: {fileName: _jsxFileName, lineNumber: 504}}
-                )
+              const markerFeatures = Array.isArray(_optionalChain([geoData, 'optionalAccess', _11 => _11.features]))
+                ? geoData.features.filter(
+                    (f) =>
+                      _optionalChain([f, 'optionalAccess', _12 => _12.properties, 'optionalAccess', _13 => _13.__marker]) &&
+                      Array.isArray(_optionalChain([f, 'optionalAccess', _14 => _14.properties, 'optionalAccess', _15 => _15.__center]))
+                  )
+                : [];
 
-                /* One status marker per project (center of boundary) */
-                , Array.isArray(_optionalChain([(geoData ), 'optionalAccess', _11 => _11.features])) &&
-                  (geoData ).features
-                    .filter((f) => _optionalChain([f, 'optionalAccess', _12 => _12.properties, 'optionalAccess', _13 => _13.__marker]) && Array.isArray(_optionalChain([f, 'optionalAccess', _14 => _14.properties, 'optionalAccess', _15 => _15.__center])))
-                    .map((f, idx) => {
-                      const center = f.properties.__center ;
-                      const status = _nullishCoalesce(_optionalChain([f, 'optionalAccess', _16 => _16.properties, 'optionalAccess', _17 => _17.status]), () => ( "pending"));
-                      const name = _nullishCoalesce(_optionalChain([f, 'optionalAccess', _18 => _18.properties, 'optionalAccess', _19 => _19.project_name]), () => ( "Project"));
-                      const rawId = _optionalChain([f, 'optionalAccess', _20 => _20.properties, 'optionalAccess', _21 => _21.id]);
-                      const idNum = typeof rawId === "number" ? rawId : Number(rawId);
-                      return (
-                        React.createElement(Marker, {
-                          key: `proj-center-${_nullishCoalesce(_optionalChain([f, 'optionalAccess', _22 => _22.properties, 'optionalAccess', _23 => _23.id]), () => ( idx))}`,
-                          position: center,
-                          icon: projectMarkerVariant === "green" ? greenDotIconRef.current : getProjectStatusIcon(status),
-                          eventHandlers: 
-                            onProjectSelect && Number.isFinite(idNum)
-                              ? {
-                                  click: () => onProjectSelect(idNum),
-                                }
-                              : undefined
-                          , __self: this, __source: {fileName: _jsxFileName, lineNumber: 545}}
+              return React.createElement(LayersControl.Overlay, { checked: true, name: showGeoBoundary ? "Proposed Area Boundary" : "Project Locations" }
+                , React.createElement(React.Fragment, null
 
-                          , React.createElement(Popup, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 557}}
-                            , React.createElement('div', { className: "p-2 text-xs font-sans"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 558}}
-                              , React.createElement('p', { className: "font-bold", __self: this, __source: {fileName: _jsxFileName, lineNumber: 559}}, String(name))
-                              , React.createElement('p', { className: "text-muted-foreground", __self: this, __source: {fileName: _jsxFileName, lineNumber: 560}}, "Status:"
-                                , " "
-                                , status === "in_progress"
-                                  ? "In Progress"
-                                  : status === "in_delay"
-                                    ? "Delayed"
-                                    : "Pending"
-                              )
+                  , showGeoBoundary && boundaryOnlyData.features.length > 0 && React.createElement(GeoJSON, {
+                      data: boundaryOnlyData,
+                      style: (feature) => {
+                        const status = _nullishCoalesce(_optionalChain([feature, 'optionalAccess', _3 => _3.properties, 'optionalAccess', _4 => _4.status]), () => ("pending"));
+                        const cfg = _nullishCoalesce(PROJECT_STATUS_STYLE[status], () => (PROJECT_STATUS_STYLE.pending));
+                        return { color: cfg.color, fillColor: cfg.fillColor, fillOpacity: 0.12, weight: 3 };
+                      },
+                      onEachFeature: (feature, layer) => {
+                        const name = _optionalChain([feature, 'access', _5 => _5.properties, 'optionalAccess', _6 => _6.project_name]);
+                        const status = _nullishCoalesce(_optionalChain([feature, 'optionalAccess', _7 => _7.properties, 'optionalAccess', _8 => _8.status]), () => ("pending"));
+                        const statusLabel = status === "in_progress" ? "In Progress" : status === "in_delay" ? "Delayed" : "Pending";
+                        if (name != null && name !== '') layer.bindPopup(`<b>${String(name)}</b><br/>${statusLabel}`);
+                        const rawId = _optionalChain([feature, 'optionalAccess', _9 => _9.properties, 'optionalAccess', _10 => _10.id]);
+                        const idNum = typeof rawId === "number" ? rawId : Number(rawId);
+                        if (onProjectSelect && Number.isFinite(idNum)) {
+                          layer.on("click", () => { onProjectSelect(idNum); });
+                        }
+                      },
+                    })
+
+                  /* Part B: cluster the per-project status markers instead of
+                     rendering 1000+ raw Leaflet markers synchronously on mount. */
+                  , markerFeatures.length > 0 && React.createElement(MarkerClusterGroup, { chunkedLoading: true, maxClusterRadius: 60 }
+                    , markerFeatures.map((f, idx) => {
+                        const center = f.properties.__center;
+                        const status = _nullishCoalesce(_optionalChain([f, 'optionalAccess', _16 => _16.properties, 'optionalAccess', _17 => _17.status]), () => ("pending"));
+                        const name = _nullishCoalesce(_optionalChain([f, 'optionalAccess', _18 => _18.properties, 'optionalAccess', _19 => _19.project_name]), () => ("Project"));
+                        const rawId = _optionalChain([f, 'optionalAccess', _20 => _20.properties, 'optionalAccess', _21 => _21.id]);
+                        const idNum = typeof rawId === "number" ? rawId : Number(rawId);
+                        return React.createElement(Marker, {
+                            key: `proj-center-${_nullishCoalesce(_optionalChain([f, 'optionalAccess', _22 => _22.properties, 'optionalAccess', _23 => _23.id]), () => (idx))}`,
+                            position: center,
+                            icon: projectMarkerVariant === "green" ? greenDotIconRef.current : getStatusIconCached(status),
+                            eventHandlers: onProjectSelect && Number.isFinite(idNum) ? { click: () => onProjectSelect(idNum) } : undefined,
+                          }
+                          , React.createElement(Popup, null
+                            , React.createElement('div', { className: "p-2 text-xs font-sans" }
+                              , React.createElement('p', { className: "font-bold" }, String(name))
+                              , React.createElement('p', { className: "text-muted-foreground" }, "Status:", " ",
+                                  status === "in_progress" ? "In Progress" : status === "in_delay" ? "Delayed" : "Pending"
+                                )
                             )
                           )
-                        )
-                      );
-                    })
-              )
-            )
-          )
+                        );
+                      })
+                    )
+                )
+              );
+            })()
         )
       )
 

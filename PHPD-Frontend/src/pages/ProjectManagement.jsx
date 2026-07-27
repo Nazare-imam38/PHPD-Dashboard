@@ -132,10 +132,17 @@ function WizardXerUploadSection({
   const openPicker = () => _optionalChain([document, 'access', _ => _.getElementById, 'call', _2 => _2(XER_FILE_INPUT_ID), 'optionalAccess', _3 => _3.click, 'call', _4 => _4()]);
 
   const existingXerHref =
-    _optionalChain([editingProject, 'optionalAccess', _5 => _5.xer_file]) &&
-    (editingProject.xer_file.startsWith("http")
-      ? editingProject.xer_file
-      : mediaUrl(editingProject.xer_file.startsWith("/") ? editingProject.xer_file : `/${editingProject.xer_file}`));
+  _optionalChain([editingProject, 'optionalAccess', _5 => _5.xer_file]) &&
+  (editingProject.xer_file.startsWith("http")
+    ? editingProject.xer_file
+    : mediaUrl(editingProject.xer_file.startsWith("/") ? editingProject.xer_file : `/${editingProject.xer_file}`));
+
+const existingXerDisplayName =
+  _optionalChain([editingProject, 'optionalAccess', _6 => _6.xer_file_name]) ||
+  _optionalChain([editingProject, 'optionalAccess', _7 => _7.xer_file]);
+
+  const activityCount = editingProject?.activities?.length || 0;
+  const hasImportedSchedule = activityCount > 0;
 
   return (
     React.createElement('div', { className: "space-y-3 min-w-0" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 195}}
@@ -150,26 +157,15 @@ function WizardXerUploadSection({
         )
       )
 
-      , editingProject && editingProject.xer_file && !xerFile && (
-        React.createElement('div', { className: "rounded-lg border bg-muted/50 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3"         , __self: this, __source: {fileName: _jsxFileName, lineNumber: 208}}
-          , React.createElement(FileText, { className: "h-8 w-8 text-muted-foreground shrink-0"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 209}} )
-          , React.createElement('div', { className: "flex-1 min-w-0 space-y-1"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 210}}
-            , React.createElement('p', { className: "text-sm font-medium truncate"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 211}}, "Current: "
-               , _nullishCoalesce(editingProject.xer_file.split("/").pop(), () => ( editingProject.xer_file))
-            )
-            , existingXerHref ? (
-              React.createElement('a', {
-                href: existingXerHref,
-                target: "_blank",
-                rel: "noopener noreferrer" ,
-                className: "text-xs text-primary hover:underline inline-block"   , __self: this, __source: {fileName: _jsxFileName, lineNumber: 215}}
-, "Open / download"
-
-              )
-            ) : null
-          )
-        )
-      )
+      , editingProject && hasImportedSchedule && !xerFile && (
+  React.createElement('div', { className: "rounded-lg border bg-muted/50 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3" }
+    , React.createElement(FileText, { className: "h-8 w-8 text-muted-foreground shrink-0" })
+    , React.createElement('div', { className: "flex-1 min-w-0 space-y-1" }
+      , React.createElement('p', { className: "text-sm font-medium truncate" }, "Schedule imported")
+      , React.createElement('p', { className: "text-xs text-muted-foreground" }, `${activityCount} activities loaded from a previously uploaded XER file`)
+    )
+  )
+)
 
       , React.createElement('div', { className: "flex flex-col gap-3"  , __self: this, __source: {fileName: _jsxFileName, lineNumber: 228}}
         , React.createElement('div', {
@@ -523,6 +519,7 @@ export default function ProjectManagement() {
       )
     );
     setSelectedZoneId(String(p.zone));
+    setSelectedCircleId(p.circle != null ? String(p.circle) : "");
     // selectedCircleId removed as it's not in the Project model
     setStakeholderIds(
       Array.isArray(p.stakeholder)
@@ -612,6 +609,7 @@ export default function ProjectManagement() {
             latitude: latitudeCoordinates.trim() || null,
             longitude: longitudeCoordinates.trim() || null,
             zone: selectedZoneId ? Number(selectedZoneId) : null,
+            circle: selectedCircleId ? Number(selectedCircleId) : null,
             district: selectedDistrictId ? Number(selectedDistrictId) : null,
             tehsil: selectedTehsilId ? Number(selectedTehsilId) : null,
             total_budget: totalBudgetAllocated.trim() || null,
@@ -1875,7 +1873,7 @@ export default function ProjectManagement() {
 
         , React.createElement(DialogContent, {
           className: 
-            "w-[95vw] max-w-[min(96vw,48rem)] sm:max-w-3xl max-h-[min(92vh,900px)] overflow-y-auto p-4 sm:p-6"
+            "w-[95vw] max-w-[min(136vw,48rem)] sm:max-w-5xl max-h-[min(92vh,900px)] overflow-y-auto p-4 sm:p-6"
           , __self: this, __source: {fileName: _jsxFileName, lineNumber: 2297}}
 
           , React.createElement(DialogHeader, {__self: this, __source: {fileName: _jsxFileName, lineNumber: 2302}}

@@ -347,7 +347,7 @@ class Project(models.Model):
                     )
         
 class ProjectActivity(models.Model):
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities")
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="activities", db_index=True)
 
     activity_id = models.CharField(max_length=100, null=True, blank=True)
     activity_name = models.CharField(max_length=255, null=True, blank=True)
@@ -357,7 +357,7 @@ class ProjectActivity(models.Model):
         null=True,
         blank=True,
         related_name="children",
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE, db_index=True
     )
 
     # ✅ PLANNED (from XER)
@@ -508,7 +508,7 @@ class TaskDependency(models.Model):
 
 class ActivityDelayLog(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="delay_logs")
-    activity = models.ForeignKey(ProjectActivity, on_delete=models.CASCADE, related_name="delay_logs")
+    activity = models.ForeignKey(ProjectActivity, on_delete=models.CASCADE, related_name="delay_logs", db_index=True)
 
     # dates
     delay_start_date = models.DateField()

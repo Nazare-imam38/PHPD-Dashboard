@@ -255,7 +255,7 @@ class Project(models.Model):
     total_consume = models.CharField(max_length=200, null=True, blank=True)
     remaining_budget = models.CharField(max_length=200, null=True, blank=True)
     xer_file = models.FileField(validators=[FileExtensionValidator(allowed_extensions=['xer'])],null=True, blank=True, max_length=500) 
-
+    xer_file_name = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True) 
     updated_at = models.DateTimeField(auto_now=True)
 

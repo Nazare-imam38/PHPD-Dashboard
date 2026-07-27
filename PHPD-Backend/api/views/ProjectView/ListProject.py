@@ -67,7 +67,6 @@
     #             data=str(e),
     #             http_status=status.HTTP_500_INTERNAL_SERVER_ERROR
     #         ).create_response()
-
 from ..common_imports import *
 from django.db.models import Prefetch
 
@@ -85,7 +84,6 @@ class ListProjectView(viewsets.ViewSet):
             project_id = request.query_params.get("id")
 
             if project_id:
-
                 project = (
                     Project.objects
                     .select_related(
@@ -112,6 +110,7 @@ class ListProjectView(viewsets.ViewSet):
                         http_status=status.HTTP_404_NOT_FOUND,
                     ).create_response()
 
+                # Single project detail view — full nested activities are fine here.
                 serializer = ProjectSerializer(project)
 
                 return ApiResponse(
@@ -121,6 +120,9 @@ class ListProjectView(viewsets.ViewSet):
                     http_status=status.HTTP_200_OK,
                 ).create_response()
 
+            # --- "All projects" list branch ---
+            # Use the lightweight dashboard serializer here too: listing 900
+            # projects should never trigger nested-activity serialization.
             queryset = (
                 Project.objects
                 .select_related(
@@ -134,7 +136,7 @@ class ListProjectView(viewsets.ViewSet):
                 )
             )
 
-            serializer = ProjectSerializer(queryset, many=True)
+            serializer = ProjectDashboardSerializer(queryset, many=True)
 
             return ApiResponse(
                 status=status.HTTP_200_OK,

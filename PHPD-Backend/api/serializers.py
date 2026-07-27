@@ -250,6 +250,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         input_formats=["%Y-%m-%d", "%Y-%m-%d %H:%M"]
     )
     xer_file = serializers.FileField(write_only=True, required=False)
+    xer_file_name = serializers.CharField(read_only=True)  
+
 
     class Meta:
         model = Project
@@ -261,7 +263,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'district', 'district_name',
             'tehsil', 'tehsil_name', 'latitude', 'longitude',
             'total_budget', 'total_consume', 'remaining_budget',
-            'xer_file', 
+            'xer_file', "xer_file_name",
             'created_at', 'updated_at', 
             "activities"
         ]
@@ -313,6 +315,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if xer_file:
             # Parse the uploaded XER in-memory and create activities without
             # persisting the file to local storage.
+            project.xer_file_name = xer_file.name
             try:
                 self._save_activities(project, xer_file)
             except Exception:
@@ -334,6 +337,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             instance.stakeholder.set(stakeholders)
 
         if xer_file:
+            instance.xer_file_name = xer_file.name
             # Rebuild activities from the uploaded XER without saving the file.
             instance.activities.all().delete()
             try:
@@ -566,3 +570,63 @@ class GISProjectStatusSerializer(serializers.ModelSerializer):
             return "in_progress"
 
         return "pending"
+
+class ProjectDashboardSerializer(serializers.ModelSerializer):
+    """Lightweight project serializer for dashboard/list views.
+    Deliberately excludes nested `activities` — the dashboard only needs
+    the pre-computed progress/status fields the view attaches separately.
+    Including activities here caused an N+1 query storm at scale
+    (ProjectActivitySerializer.get_project_name re-fetches project per activity)
+    plus a multi-MB response payload.
+    """
+    zone_name = serializers.SerializerMethodField()
+    circle = serializers.SerializerMethodField()
+    circle_name = serializers.SerializerMethodField()
+    district_name = serializers.SerializerMethodField()
+    tehsil_name = serializers.SerializerMethodField()
+    stakeholder_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            'id', 'stakeholder_details',
+            'project_name', 'project_description',
+            'project_starting_date', 'project_reference_no', 'project_category', 'project_category_other',
+            'zone', 'zone_name', 'circle', 'circle_name',
+            'district', 'district_name',
+            'tehsil', 'tehsil_name', 'latitude', 'longitude',
+            'total_budget', 'total_consume', 'remaining_budget',
+            'created_at', 'updated_at',
+        ]
+
+    def get_zone_name(self, obj):
+        return obj.zone.zone_name if obj.zone else None
+
+    def get_circle(self, obj):
+        if obj.tehsil and obj.tehsil.circle:
+            return obj.tehsil.circle.id
+        if obj.district and obj.district.circle:
+            return obj.district.circle.id
+        return None
+
+    def get_circle_name(self, obj):
+        if obj.tehsil and obj.tehsil.circle:
+            return obj.tehsil.circle.circle_name
+        if obj.district and obj.district.circle:
+            return obj.district.circle.circle_name
+        return None
+
+    def get_district_name(self, obj):
+        return obj.district.district_name if obj.district else None
+
+    def get_tehsil_name(self, obj):
+        return obj.tehsil.tehsil_name if obj.tehsil else None
+
+    def get_stakeholder_details(self, obj):
+        return [
+            {
+                "stakeholder_type": s.stakeholder_type,
+                "stakeholder_title": s.stakeholder_title
+            }
+            for s in obj.stakeholder.all()
+        ]

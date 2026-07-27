@@ -889,44 +889,58 @@ export default function Dashboard() {
   const apiTopHierarchy = dashboardPageData?.topHierarchy ?? [];
   const apiMapProjects = dashboardPageData?.mapProjects ?? [];
 
+  // const ganttProgressByProjectId = useMemo(() => {
+  //   const findNodeById = (
+  //     nodes,
+  //     targetId,
+  //   ) => {
+  //     for (const n of nodes) {
+  //       if (String(_nullishCoalesce(_nullishCoalesce(_optionalChain([n, 'optionalAccess', _9 => _9._id]), () => (_optionalChain([n, 'optionalAccess', _10 => _10.id]))), () => (""))) === targetId) return n;
+  //       const children = Array.isArray(_optionalChain([n, 'optionalAccess', _11 => _11.subtasks])) ? n.subtasks : [];
+  //       const hit = children.length ? findNodeById(children, targetId) : null;
+  //       if (hit) return hit;
+  //     }
+  //     return null;
+  //   };
+
+  //   const clampPct = (n) => Math.max(0, Math.min(100, n));
+  //   const toPct = (v) => {
+  //     const n = Number(v);
+  //     return Number.isFinite(n) ? clampPct(n) : 0;
+  //   };
+
+  //   const map = new Map();
+  //   for (const s of apiProjectGanttAll) {
+  //     const pid = Number(_optionalChain([s, 'optionalAccess', _12 => _12._id]));
+  //     if (!Number.isFinite(pid)) continue;
+  //     const tasks = Array.isArray(_optionalChain([s, 'optionalAccess', _13 => _13.tasks])) ? s.tasks : [];
+  //     const root = _nullishCoalesce(_nullishCoalesce(findNodeById(tasks, "1"), () => (tasks[0])), () => (null));
+  //     map.set(pid, toPct(_optionalChain([root, 'optionalAccess', _14 => _14.progress])));
+  //   }
+
+  //   // New calculated dashboard API already supplies one physical-progress value
+  //   // per project, so the heavy all-project Gantt payload is no longer required.
+  //   for (const project of apiProjects) {
+  //     const pid = Number(project.id);
+  //     if (!Number.isFinite(pid) || map.has(pid)) continue;
+  //     map.set(pid, toPct(project.physical_progress));
+  //   }
+  //   return map;
+  // }, [apiProjectGanttAll, apiProjects]);
   const ganttProgressByProjectId = useMemo(() => {
-    const findNodeById = (
-      nodes,
-      targetId,
-    ) => {
-      for (const n of nodes) {
-        if (String(_nullishCoalesce(_nullishCoalesce(_optionalChain([n, 'optionalAccess', _9 => _9._id]), () => (_optionalChain([n, 'optionalAccess', _10 => _10.id]))), () => (""))) === targetId) return n;
-        const children = Array.isArray(_optionalChain([n, 'optionalAccess', _11 => _11.subtasks])) ? n.subtasks : [];
-        const hit = children.length ? findNodeById(children, targetId) : null;
-        if (hit) return hit;
-      }
-      return null;
-    };
-
-    const clampPct = (n) => Math.max(0, Math.min(100, n));
-    const toPct = (v) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? clampPct(n) : 0;
-    };
-
-    const map = new Map();
-    for (const s of apiProjectGanttAll) {
-      const pid = Number(_optionalChain([s, 'optionalAccess', _12 => _12._id]));
-      if (!Number.isFinite(pid)) continue;
-      const tasks = Array.isArray(_optionalChain([s, 'optionalAccess', _13 => _13.tasks])) ? s.tasks : [];
-      const root = _nullishCoalesce(_nullishCoalesce(findNodeById(tasks, "1"), () => (tasks[0])), () => (null));
-      map.set(pid, toPct(_optionalChain([root, 'optionalAccess', _14 => _14.progress])));
-    }
-
-    // New calculated dashboard API already supplies one physical-progress value
-    // per project, so the heavy all-project Gantt payload is no longer required.
-    for (const project of apiProjects) {
-      const pid = Number(project.id);
-      if (!Number.isFinite(pid) || map.has(pid)) continue;
-      map.set(pid, toPct(project.physical_progress));
-    }
-    return map;
-  }, [apiProjectGanttAll, apiProjects]);
+  const map = new Map();
+  const clampPct = (n) => Math.max(0, Math.min(100, n));
+  const toPct = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? clampPct(n) : 0;
+  };
+  for (const project of apiProjects) {
+    const pid = Number(project.id);
+    if (!Number.isFinite(pid)) continue;
+    map.set(pid, toPct(project.physical_progress));
+  }
+  return map;
+}, [apiProjects]);
 
   // Map status (delay / in progress / pending) derived from nested gantt, for GIS boundary coloring + markers.
   const projectStatusById = useMemo(() => {

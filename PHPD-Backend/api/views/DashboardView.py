@@ -3,13 +3,17 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 
+from django.core.cache import cache
 from django.db.models import Prefetch
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.models import Circle, Project, ProjectActivity, Tehsil, Zone
-from api.serializers import ProjectSerializer
+from api.serializers import ProjectDashboardSerializer
+
+
+CACHE_TIMEOUT_SECONDS = 60  # tune as needed; invalidated on project/activity changes (see bottom note)
 
 
 def _number(value) -> float:
@@ -41,11 +45,11 @@ def _calculate_project_physical_progress(activities: list[ProjectActivity]) -> f
     for activity in activities:
         by_parent[activity.parent_id].append(activity)
 
-    cache: dict[int, tuple[float, float]] = {}
+    cache_local: dict[int, tuple[float, float]] = {}
 
     def node_value(activity: ProjectActivity) -> tuple[float, float]:
-        if activity.id in cache:
-            return cache[activity.id]
+        if activity.id in cache_local:
+            return cache_local[activity.id]
 
         children = by_parent.get(activity.id, [])
         if children:
@@ -61,8 +65,8 @@ def _calculate_project_physical_progress(activities: list[ProjectActivity]) -> f
             progress = _percent(activity.progress)
             weight = _activity_weight(activity)
 
-        cache[activity.id] = (progress, weight)
-        return cache[activity.id]
+        cache_local[activity.id] = (progress, weight)
+        return cache_local[activity.id]
 
     roots = by_parent.get(None, []) or activities
     weighted_total = 0.0
@@ -175,9 +179,16 @@ def _all_hierarchy_rows(page: str, project_rows: list[dict]) -> list[dict]:
             for row in project_rows
         ]
 
+    # Group once (O(n)) instead of filtering project_rows per object (O(n*m)).
+    grouped: dict[int, list[dict]] = defaultdict(list)
+    for row in project_rows:
+        val = row.get(key)
+        if val is not None:
+            grouped[val].append(row)
+
     rows = []
     for obj in objects:
-        scoped = [row for row in project_rows if row.get(key) == obj.id]
+        scoped = grouped.get(obj.id, [])
         summary = _project_scope_summary(scoped)
         rows.append({
             "id": obj.id,
@@ -224,10 +235,23 @@ def _top_hierarchy(rows: list[dict], limit: int = 5) -> list[dict]:
     )[:limit]
 
 
-def _legacy_hierarchy_payloads(project_rows: list[dict]):
+def _legacy_hierarchy_payloads(page: str, project_rows: list[dict]):
+    """Build divisions/districts/tehsils payloads.
+
+    Only computes the hierarchy levels the requested page actually needs —
+    each level is an O(objects + projects) grouped pass (see _all_hierarchy_rows),
+    but there's no reason to pay for circle/tehsil aggregation on a page that
+    doesn't use it (e.g. the "zones" page only needs zone-level rollups).
+    """
     zone_metrics = {r["id"]: r for r in _all_hierarchy_rows("zones", project_rows)}
-    circle_metrics = {r["id"]: r for r in _all_hierarchy_rows("circles", project_rows)}
-    tehsil_metrics = {r["id"]: r for r in _all_hierarchy_rows("tehsils", project_rows)}
+    circle_metrics = (
+        {r["id"]: r for r in _all_hierarchy_rows("circles", project_rows)}
+        if page in ("circles", "tehsils", "projects") else {}
+    )
+    tehsil_metrics = (
+        {r["id"]: r for r in _all_hierarchy_rows("tehsils", project_rows)}
+        if page in ("tehsils", "projects") else {}
+    )
 
     divisions = []
     for zone in Zone.objects.all().order_by("zone_name"):
@@ -241,36 +265,38 @@ def _legacy_hierarchy_payloads(project_rows: list[dict]):
         })
 
     districts = []
-    for circle in Circle.objects.select_related("zone").all().order_by("circle_name"):
-        metric = circle_metrics.get(circle.id, {})
-        districts.append({
-            "id": circle.id,
-            "district_name": circle.circle_name,
-            "circle_name": circle.circle_name,
-            "division": circle.zone_id,
-            "circle": circle.id,
-            "zone": circle.zone_id,
-            "zone_name": circle.zone.zone_name,
-            **metric,
-        })
+    if circle_metrics or page in ("circles", "tehsils", "projects"):
+        for circle in Circle.objects.select_related("zone").all().order_by("circle_name"):
+            metric = circle_metrics.get(circle.id, {})
+            districts.append({
+                "id": circle.id,
+                "district_name": circle.circle_name,
+                "circle_name": circle.circle_name,
+                "division": circle.zone_id,
+                "circle": circle.id,
+                "zone": circle.zone_id,
+                "zone_name": circle.zone.zone_name,
+                **metric,
+            })
 
     tehsils = []
-    for tehsil in Tehsil.objects.select_related("zone", "circle", "district").all().order_by("tehsil_name"):
-        metric = tehsil_metrics.get(tehsil.id, {})
-        tehsils.append({
-            "id": tehsil.id,
-            "tehsil_name": tehsil.tehsil_name,
-            "district": tehsil.circle_id,  # backward-compatible dashboard alias
-            "district_name": tehsil.circle.circle_name if tehsil.circle_id else None,
-            "actual_district": tehsil.district_id,
-            "actual_district_name": tehsil.district.district_name if tehsil.district_id else None,
-            "circle": tehsil.circle_id,
-            "circle_name": tehsil.circle.circle_name if tehsil.circle_id else None,
-            "division": tehsil.zone_id,
-            "zone": tehsil.zone_id,
-            "zone_name": tehsil.zone.zone_name if tehsil.zone_id else None,
-            **metric,
-        })
+    if tehsil_metrics or page in ("tehsils", "projects"):
+        for tehsil in Tehsil.objects.select_related("zone", "circle", "district").all().order_by("tehsil_name"):
+            metric = tehsil_metrics.get(tehsil.id, {})
+            tehsils.append({
+                "id": tehsil.id,
+                "tehsil_name": tehsil.tehsil_name,
+                "district": tehsil.circle_id,  # backward-compatible dashboard alias
+                "district_name": tehsil.circle.circle_name if tehsil.circle_id else None,
+                "actual_district": tehsil.district_id,
+                "actual_district_name": tehsil.district.district_name if tehsil.district_id else None,
+                "circle": tehsil.circle_id,
+                "circle_name": tehsil.circle.circle_name if tehsil.circle_id else None,
+                "division": tehsil.zone_id,
+                "zone": tehsil.zone_id,
+                "zone_name": tehsil.zone.zone_name if tehsil.zone_id else None,
+                **metric,
+            })
 
     return divisions, districts, tehsils
 
@@ -283,9 +309,13 @@ class DashboardPageDataView(APIView):
         if page not in self.VALID_PAGES:
             return Response({"detail": "Invalid dashboard page."}, status=404)
 
+        cache_key = f"dashboard_page_data_{page}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
         activity_queryset = (
             ProjectActivity.objects
-            .select_related("parent")
             .prefetch_related("delay_logs")
             .order_by("id")
         )
@@ -301,9 +331,9 @@ class DashboardPageDataView(APIView):
         summary = _page_summary(page, hierarchy_rows, project_rows)
         best_projects = _top_projects(project_rows, 6)
         top_hierarchy = _top_hierarchy(hierarchy_rows, 5)
-        divisions, districts, tehsils = _legacy_hierarchy_payloads(project_rows)
+        divisions, districts, tehsils = _legacy_hierarchy_payloads(page, project_rows)
 
-        serialized_projects = ProjectSerializer(projects, many=True, context={"request": request}).data
+        serialized_projects = ProjectDashboardSerializer(projects, many=True, context={"request": request}).data
         metrics_by_id = {row["id"]: row for row in project_rows}
         projects_payload = []
         for project_data in serialized_projects:
@@ -318,7 +348,7 @@ class DashboardPageDataView(APIView):
             })
             projects_payload.append(row)
 
-        return Response({
+        response_data = {
             "page": page,
             "summary": summary,
             "financial_chart": {
@@ -339,4 +369,7 @@ class DashboardPageDataView(APIView):
             "tehsils": tehsils,
             "projects": projects_payload,
             "project_gantt_all": [],
-        })
+        }
+
+        cache.set(cache_key, response_data, timeout=CACHE_TIMEOUT_SECONDS)
+        return Response(response_data)

@@ -64,22 +64,20 @@ class StandardResultsSetPagination(PageNumberPagination):
             'results': data
         })
 def project_image_file_path(instance, filename):
-    ext = filename.split('.')[-1]
+    ext = filename.split('.')[-1].lower()
     filename = f"{uuid.uuid4()}.{ext}"
 
-    # Use image_date if available
     if instance.image_date:
         date_folder = instance.image_date.strftime("%Y-%m-%d")
     else:
         date_folder = "undated"
 
-    # 🔥 Use project name instead of ID
-    project_name = slugify(instance.project.project_name)
+    project_name = slugify(instance.project.project_name) if instance.project.project_name else "no-project"
 
-    return os.path.join(
-        f"projects/{project_name}/daily_logs/{date_folder}/",
-        filename
+    path = os.path.join(
+        "projects", project_name, "daily_logs", date_folder, filename
     )
+    return path.replace("\\", "/")   # normalize Windows-style separators
 
 def project_doc_file_path(instance, filename):
 

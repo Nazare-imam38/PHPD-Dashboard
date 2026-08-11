@@ -1,8 +1,8 @@
-﻿import React from "react";
+import React from "react";
 const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FolderKanban, Plus, Upload, FileText, X, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays, MapPin, Trash2 } from "lucide-react";
+import { FolderKanban, Plus, Upload, FileText, X, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays, MapPin, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1447,8 +1447,8 @@ const confirmDeleteProject = () => {
                         size: "sm",
                         onClick: () => handleDeleteProject(project.id),
                         disabled: deleteProjectMutation.isPending,
-                        className: "gap-1.5 h-8 w-8 p-0 border-border text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30", __self: this }
-                        , React.createElement(Trash2, { className: "h-3.5 w-3.5", __self: this })
+                        className: "flex-1 gap-1.5 h-8 border-destructive/20 text-destructive bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors", __self: this }
+                        , React.createElement(Trash2, { className: "h-3.5 w-3.5", __self: this }), "Delete"
                       )
                     )
                     
@@ -1884,48 +1884,74 @@ const confirmDeleteProject = () => {
         })()
         , deleteTarget && (
           React.createElement(Dialog, { open: true, onOpenChange: (open) => { if (!open) setDeleteTarget(null); } }
-            , React.createElement(DialogContent, { className: "max-w-md" }
-              , React.createElement(DialogHeader, {}
-                , React.createElement(DialogTitle, {}, `Delete "${deleteTarget.project?.project_name || "this project"}"?`)
-                , React.createElement(DialogDescription, {}, "This action cannot be undone.")
+            , React.createElement(DialogContent, { className: "max-w-md p-0 overflow-hidden border-0 shadow-2xl rounded-3xl" }
+              , React.createElement('div', { className: "p-6 pt-8 pb-6 bg-white dark:bg-slate-950 flex flex-col items-center relative" }
+                , React.createElement('div', { className: "h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 flex items-center justify-center mb-5 ring-8 ring-red-50 dark:ring-red-950/50 shadow-sm" }
+                  , React.createElement(Trash2, { className: "h-8 w-8" })
+                )
+                , React.createElement(DialogHeader, { className: "text-center space-y-2 w-full" }
+                  , React.createElement(DialogTitle, { className: "text-2xl font-bold text-center text-slate-800 dark:text-slate-100" }, `Delete "${deleteTarget.project?.project_name || "this project"}"?`)
+                  , React.createElement(DialogDescription, { className: "text-center text-slate-500 dark:text-slate-400 text-[15px] max-w-[280px] mx-auto leading-relaxed" }, "This action cannot be undone. All data will be permanently removed.")
+                )
               )
-              , React.createElement('div', { className: "space-y-3 text-sm" }
-                , deleteInfoLoading && React.createElement('p', { className: "text-muted-foreground" }, "Checking related data…")
+              , React.createElement('div', { className: "px-6 pb-6 pt-2 bg-slate-50 dark:bg-slate-900/50 flex flex-col gap-5" }
+                , deleteInfoLoading && React.createElement('div', { className: "flex justify-center py-6" }
+                  , React.createElement('div', { className: "h-6 w-6 rounded-full border-2 border-slate-300 border-t-red-600 animate-spin" })
+                )
                 , deleteTarget.info && (
-                  React.createElement('div', { className: "space-y-2" }
-                    , React.createElement('p', { className: "text-muted-foreground" }, "This project will permanently delete:")
-                    , React.createElement('ul', { className: "list-disc pl-5 space-y-1" }
-                      , deleteTarget.info.activities_count > 0 && React.createElement('li', {}, `${deleteTarget.info.activities_count} project activit${deleteTarget.info.activities_count === 1 ? "y" : "ies"}`)
-                      , deleteTarget.info.images_count > 0 && React.createElement('li', {}, `${deleteTarget.info.images_count} progress image${deleteTarget.info.images_count === 1 ? "" : "s"}`)
-                      , deleteTarget.info.documents_count > 0 && React.createElement('li', {}, `${deleteTarget.info.documents_count} document${deleteTarget.info.documents_count === 1 ? "" : "s"}`)
-                      , deleteTarget.info.has_xer_file && React.createElement('li', {}, "The uploaded XER schedule")
+                  React.createElement('div', { className: "bg-white dark:bg-slate-950 rounded-2xl border border-red-100 dark:border-red-900/30 p-4 sm:p-5 shadow-sm" }
+                    , React.createElement('p', { className: "text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2" }
+                       , React.createElement(AlertTriangle, { className: "h-4.5 w-4.5 text-amber-500" })
+                       , "This project includes:"
+                    )
+                    , React.createElement('ul', { className: "space-y-2.5" }
+                      , deleteTarget.info.activities_count > 0 && React.createElement('li', { className: "flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400" }
+                        , React.createElement('div', { className: "h-1.5 w-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" })
+                        , React.createElement('span', null, React.createElement('strong', { className: "text-slate-800 dark:text-slate-200" }, deleteTarget.info.activities_count), ` project activit${deleteTarget.info.activities_count === 1 ? "y" : "ies"}`)
+                      )
+                      , deleteTarget.info.images_count > 0 && React.createElement('li', { className: "flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400" }
+                        , React.createElement('div', { className: "h-1.5 w-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" })
+                        , React.createElement('span', null, React.createElement('strong', { className: "text-slate-800 dark:text-slate-200" }, deleteTarget.info.images_count), ` progress image${deleteTarget.info.images_count === 1 ? "" : "s"}`)
+                      )
+                      , deleteTarget.info.documents_count > 0 && React.createElement('li', { className: "flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400" }
+                        , React.createElement('div', { className: "h-1.5 w-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" })
+                        , React.createElement('span', null, React.createElement('strong', { className: "text-slate-800 dark:text-slate-200" }, deleteTarget.info.documents_count), ` document${deleteTarget.info.documents_count === 1 ? "" : "s"}`)
+                      )
+                      , deleteTarget.info.has_xer_file && React.createElement('li', { className: "flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-400" }
+                        , React.createElement('div', { className: "h-1.5 w-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" })
+                        , React.createElement('span', null, "The uploaded XER schedule")
+                      )
                     )
                     , deleteTarget.info.activities_with_attachments?.length > 0 && (
-                      React.createElement('div', { className: "mt-3 rounded-lg border bg-muted/40 p-3 space-y-1.5" }
-                        , React.createElement('p', { className: "text-xs font-semibold text-muted-foreground uppercase tracking-wide" }, "Activities with attachments")
-                        , deleteTarget.info.activities_with_attachments.map((a) => (
-                          React.createElement('div', { key: a.activity_id, className: "flex items-center justify-between text-xs" }
-                            , React.createElement('span', { className: "truncate pr-2" }, a.activity_name || `Activity #${a.activity_id}`)
-                            , React.createElement('span', { className: "text-muted-foreground shrink-0" }
-                              , [
-                                  a.images_count ? `${a.images_count} image${a.images_count === 1 ? "" : "s"}` : null,
-                                  a.documents_count ? `${a.documents_count} doc${a.documents_count === 1 ? "" : "s"}` : null,
-                                ].filter(Boolean).join(", ")
+                      React.createElement('div', { className: "mt-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-3.5 space-y-2.5" }
+                        , React.createElement('p', { className: "text-[11px] font-bold text-slate-500 uppercase tracking-wider" }, "Activities with attachments")
+                        , React.createElement('div', { className: "max-h-[120px] overflow-y-auto pr-1 space-y-2 scrollbar-thin" }
+                          , deleteTarget.info.activities_with_attachments.map((a) => (
+                            React.createElement('div', { key: a.activity_id, className: "flex items-center justify-between text-[13px]" }
+                              , React.createElement('span', { className: "truncate pr-2 font-medium text-slate-700 dark:text-slate-300" }, a.activity_name || `Activity #${a.activity_id}`)
+                              , React.createElement('span', { className: "text-slate-500 dark:text-slate-400 shrink-0 text-xs bg-slate-200/50 dark:bg-slate-800 px-2 py-0.5 rounded-full" }
+                                , [
+                                    a.images_count ? `${a.images_count} img` : null,
+                                    a.documents_count ? `${a.documents_count} doc` : null,
+                                  ].filter(Boolean).join(", ")
+                              )
                             )
-                          )
-                        ))
+                          ))
+                        )
                       )
                     )
                   )
                 )
-              )
-              , React.createElement(DialogFooter, {}
-                , React.createElement(Button, { variant: "outline", onClick: () => setDeleteTarget(null) }, "Cancel")
-                , React.createElement(Button, {
-                    variant: "destructive",
-                    onClick: confirmDeleteProject,
-                    disabled: deleteProjectMutation.isPending,
-                  }, deleteProjectMutation.isPending ? "Deleting…" : "Delete Project")
+                , React.createElement(DialogFooter, { className: "flex flex-col-reverse sm:flex-row gap-3 w-full sm:space-x-0" }
+                  , React.createElement(Button, { type: "button", variant: "outline", className: "w-full sm:flex-1 h-11 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-100", onClick: () => setDeleteTarget(null) }, "Cancel")
+                  , React.createElement(Button, {
+                      type: "button",
+                      variant: "destructive",
+                      className: "w-full sm:flex-1 h-11 rounded-xl bg-red-600 text-white hover:bg-red-700 font-semibold shadow-sm hover:shadow transition-all",
+                      onClick: confirmDeleteProject,
+                      disabled: deleteProjectMutation.isPending,
+                    }, deleteProjectMutation.isPending ? "Deleting…" : "Delete Project")
+                )
               )
             )
           )

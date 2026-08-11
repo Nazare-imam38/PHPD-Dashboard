@@ -253,3 +253,6 @@ export async function updateProject(id, payload) {
 export async function deleteProject(id) {
   await del(`${DELETE_PATH}${id}/`);
 }
+export async function getProjectDeleteInfo(id) {
+  return get(`${DELETE_PATH}${id}/`);
+}

@@ -2,7 +2,7 @@
 const _jsxFileName = ""; function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FolderKanban, Plus, Upload, FileText, X, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays, MapPin } from "lucide-react";
+import { FolderKanban, Plus, Upload, FileText, X, ChevronRight, ChevronLeft, CheckCircle2, Calendar, Eye, Pencil, ChevronDown, Building2, Wallet, Landmark, HandCoins, Percent, CalendarDays, MapPin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ import {
   updateProject,
   deleteProject,
   listProjectActivities,
+  getProjectDeleteInfo,
 } from "@/api";
 
 import { mediaUrl } from "@/api/config";
@@ -248,6 +249,8 @@ export default function ProjectManagement() {
   const [currentStep, setCurrentStep] = useState(1);
   const [editingProject, setEditingProject] = useState(null);
   const [selectedProjectForView, setSelectedProjectForView] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { project, info } | null
+  const [deleteInfoLoading, setDeleteInfoLoading] = useState(false);
   const [selectedProjectActivities, setSelectedProjectActivities] = useState([]);
   const [selectedProjectActivitiesLoading, setSelectedProjectActivitiesLoading] =
     useState(false);
@@ -642,14 +645,26 @@ export default function ProjectManagement() {
     }
   };
 
-  const handleDeleteProject = (id) => {
-    const project = projectsData.find((p) => p.id === id);
-    if (window.confirm(`Are you sure you want to delete "${_optionalChain([project, 'optionalAccess', _14 => _14.project_name])}"?`)) {
-      deleteProjectMutation.mutate(id);
-      setSelectedProjectForView((prev) => (_optionalChain([prev, 'optionalAccess', _15 => _15.id]) === id ? null : prev));
-    }
-  };
+const handleDeleteProject = async (id) => {
+  const project = projectsData.find((p) => p.id === id);
+  setDeleteInfoLoading(true);
+  let info = null;
+  try {
+    info = await getProjectDeleteInfo(id);
+  } catch {
+    // best-effort; dialog still opens, just without the breakdown
+  }
+  setDeleteInfoLoading(false);
+  setDeleteTarget({ project, info });
+};
 
+const confirmDeleteProject = () => {
+  if (!deleteTarget) return;
+  const id = deleteTarget.project.id;
+  deleteProjectMutation.mutate(id);
+  setSelectedProjectForView((prev) => (prev?.id === id ? null : prev));
+  setDeleteTarget(null);
+};
   const filteredProjects = useMemo(() => {
     const query = locationSearch.trim().toLowerCase();
 
@@ -1429,7 +1444,16 @@ export default function ProjectManagement() {
                         , React.createElement(Eye, { className: "h-3.5 w-3.5" , __self: this, __source: {fileName: _jsxFileName, lineNumber: 1940}} ), "View"
 
                       )
+                      , React.createElement(Button, {
+                        variant: "outline",
+                        size: "sm",
+                        onClick: () => handleDeleteProject(project.id),
+                        disabled: deleteProjectMutation.isPending,
+                        className: "gap-1.5 h-8 w-8 p-0 border-border text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30", __self: this }
+                        , React.createElement(Trash2, { className: "h-3.5 w-3.5", __self: this })
+                      )
                     )
+                    
                   )
                 )
               );
@@ -1860,7 +1884,54 @@ export default function ProjectManagement() {
             )
           );
         })()
-
+        , deleteTarget && (
+          React.createElement(Dialog, { open: true, onOpenChange: (open) => { if (!open) setDeleteTarget(null); } }
+            , React.createElement(DialogContent, { className: "max-w-md" }
+              , React.createElement(DialogHeader, {}
+                , React.createElement(DialogTitle, {}, `Delete "${deleteTarget.project?.project_name || "this project"}"?`)
+                , React.createElement(DialogDescription, {}, "This action cannot be undone.")
+              )
+              , React.createElement('div', { className: "space-y-3 text-sm" }
+                , deleteInfoLoading && React.createElement('p', { className: "text-muted-foreground" }, "Checking related data…")
+                , deleteTarget.info && (
+                  React.createElement('div', { className: "space-y-2" }
+                    , React.createElement('p', { className: "text-muted-foreground" }, "This project will permanently delete:")
+                    , React.createElement('ul', { className: "list-disc pl-5 space-y-1" }
+                      , deleteTarget.info.activities_count > 0 && React.createElement('li', {}, `${deleteTarget.info.activities_count} project activit${deleteTarget.info.activities_count === 1 ? "y" : "ies"}`)
+                      , deleteTarget.info.images_count > 0 && React.createElement('li', {}, `${deleteTarget.info.images_count} progress image${deleteTarget.info.images_count === 1 ? "" : "s"}`)
+                      , deleteTarget.info.documents_count > 0 && React.createElement('li', {}, `${deleteTarget.info.documents_count} document${deleteTarget.info.documents_count === 1 ? "" : "s"}`)
+                      , deleteTarget.info.has_xer_file && React.createElement('li', {}, "The uploaded XER schedule")
+                    )
+                    , deleteTarget.info.activities_with_attachments?.length > 0 && (
+                      React.createElement('div', { className: "mt-3 rounded-lg border bg-muted/40 p-3 space-y-1.5" }
+                        , React.createElement('p', { className: "text-xs font-semibold text-muted-foreground uppercase tracking-wide" }, "Activities with attachments")
+                        , deleteTarget.info.activities_with_attachments.map((a) => (
+                          React.createElement('div', { key: a.activity_id, className: "flex items-center justify-between text-xs" }
+                            , React.createElement('span', { className: "truncate pr-2" }, a.activity_name || `Activity #${a.activity_id}`)
+                            , React.createElement('span', { className: "text-muted-foreground shrink-0" }
+                              , [
+                                  a.images_count ? `${a.images_count} image${a.images_count === 1 ? "" : "s"}` : null,
+                                  a.documents_count ? `${a.documents_count} doc${a.documents_count === 1 ? "" : "s"}` : null,
+                                ].filter(Boolean).join(", ")
+                            )
+                          )
+                        ))
+                      )
+                    )
+                  )
+                )
+              )
+              , React.createElement(DialogFooter, {}
+                , React.createElement(Button, { variant: "outline", onClick: () => setDeleteTarget(null) }, "Cancel")
+                , React.createElement(Button, {
+                    variant: "destructive",
+                    onClick: confirmDeleteProject,
+                    disabled: deleteProjectMutation.isPending,
+                  }, deleteProjectMutation.isPending ? "Deleting…" : "Delete Project")
+              )
+            )
+          )
+        )
 
       /* Add Project Dialog (also used as full-page on /project-management/create) */
       , React.createElement(Dialog, {
